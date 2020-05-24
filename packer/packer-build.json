@@ -1,0 +1,56 @@
+{
+    "variables": {
+        /* aws_access_key & aws_secret_key – Ignore this if configured in the AWS CLI tool installation section. Often set on ~/.aws/credentials*/
+        "aws_access_key": "",
+        "aws_secret_key": "",
+        "ami_name": "tomcat-ami",
+        "aws_region": "us-east-1",
+        "ssh_username": "centos",
+        /*ssh_username – AMI SSH user. Since I’m using CentOS 7 image available on AWS as a base image, the default ssh user is centos, for Ubuntu, use ubuntu.*/
+        "vpc_id": "",
+        "subnet_id": ""
+    },
+    "builders": [{
+        "type": "amazon-ebs",
+        "access_key": "{{user `aws_access_key`}}",
+        "secret_key": "{{user `aws_secret_key`}}",
+        "region": "{{user `aws_region`}}",
+        "instance_type": "t2.micro",
+        /*instance_type – The EC2 instance type to use while building the AMI.*/
+        "force_deregister": "true",
+        "ssh_username": "{{user `ssh_username`}}",
+        "communicator": "ssh",
+        "associate_public_ip_address": true,
+        "subnet_id": "{{user `subnet_id`}}",
+        "ami_name": "{{user `ami_name`}}",
+        /*source_ami_filter: The initial AMI used as a base for the newly created machine image. Its value can be AMI ID or a filter to get ID.*/
+        "source_ami_filter": {
+            "filters": {
+                "virtualization-type": "hvm",
+                "name": "CentOS Linux 7 x86_64 HVM EBS *",
+                "root-device-type": "ebs"
+            },
+            "owners": ["679593333241"],
+            "most_recent": true
+        },
+        "run_tags": {
+            "Name": "packer-build-image"
+        }
+    }],
+    "provisioners": [{
+            "type": "shell",
+            "inline": "while [ ! -f /var/lib/cloud/instance/boot-finished ]; do echo 'Waiting for cloud-init...'; sleep 1; done"
+        },
+        {
+            "type": "shell",
+            "script": "./provisioners/scripts/bootstrap.sh"
+        },
+        {
+            "type": "ansible",
+            "playbook_file": "./provisioners/ansible/setup-server.yml"
+        },
+        {
+            "type": "ansible",
+            "playbook_file": "./provisioners/ansible/deploy_app.yml"
+        }]
+}
